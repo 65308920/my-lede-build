@@ -149,3 +149,32 @@ jobs:
       with:
         retain_days: 0
         keep_minimum_runs: 2
+
+    - name: Delete older releases
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: releases } = await github.rest.repos.listReleases({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+          });
+          const keep_latest = 3;
+          if (releases.length > keep_latest) {
+            for (let i = keep_latest; i < releases.length; i++) {
+              console.log(`Deleting release: ${releases[i].tag_name}`);
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: releases[i].id,
+              });
+              try {
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${releases[i].tag_name}`,
+                });
+              } catch (e) {
+                console.log(`Tag ${releases[i].tag_name} already deleted or not found.`);
+              }
+            }
+          }        
